@@ -38,6 +38,7 @@ import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.budgetapp.personal.model.TransactionType
@@ -61,7 +62,13 @@ fun TransactionInputCard(
     val submitTransaction = {
         if (isAmountValid && parsedAmount != null) {
             val description = descriptionText.trim().ifEmpty {
-                if (selectedType == TransactionType.DAILY_EXPENSE) "Expense" else "Monthly Addition"
+                when (selectedType) {
+                    TransactionType.DAILY_EXPENSE -> "Expense"
+                    TransactionType.MONTHLY_EXPENSE -> "Monthly Expense"
+                    TransactionType.LUXURY_EXPENSE -> "Luxury Expense"
+                    TransactionType.MONTHLY_ADDITION -> "Monthly Addition"
+                    TransactionType.LUXURY_ADDITION -> "Luxury Addition"
+                }
             }
             onAddTransaction(parsedAmount, description, selectedType)
             amountText = ""
@@ -117,7 +124,7 @@ fun TransactionInputCard(
                 )
 
                 // Dropdown for TransactionType
-                Box(modifier = Modifier.weight(1.2f)) {
+                Box(modifier = Modifier.weight(1.3f)) {
                     OutlinedCard(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -136,12 +143,16 @@ fun TransactionInputCard(
                             Text(
                                 text = when (selectedType) {
                                     TransactionType.DAILY_EXPENSE -> "Daily Expense"
+                                    TransactionType.MONTHLY_EXPENSE -> "Monthly Expense"
+                                    TransactionType.LUXURY_EXPENSE -> "Luxury Expense"
                                     TransactionType.MONTHLY_ADDITION -> "Add to Monthly"
-                                    else -> selectedType.name
+                                    TransactionType.LUXURY_ADDITION -> "Add to Luxury"
                                 },
                                 style = MaterialTheme.typography.bodyMedium,
                                 fontWeight = FontWeight.Medium,
-                                maxLines = 1
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.weight(1f, fill = false)
                             )
                             Icon(
                                 imageVector = Icons.Default.ArrowDropDown,
@@ -162,9 +173,30 @@ fun TransactionInputCard(
                             }
                         )
                         DropdownMenuItem(
+                            text = { Text("Monthly Expense") },
+                            onClick = {
+                                selectedType = TransactionType.MONTHLY_EXPENSE
+                                dropdownExpanded = false
+                            }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Luxury Expense") },
+                            onClick = {
+                                selectedType = TransactionType.LUXURY_EXPENSE
+                                dropdownExpanded = false
+                            }
+                        )
+                        DropdownMenuItem(
                             text = { Text("Add to Monthly Budget") },
                             onClick = {
                                 selectedType = TransactionType.MONTHLY_ADDITION
+                                dropdownExpanded = false
+                            }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Add to Luxury Budget") },
+                            onClick = {
+                                selectedType = TransactionType.LUXURY_ADDITION
                                 dropdownExpanded = false
                             }
                         )
