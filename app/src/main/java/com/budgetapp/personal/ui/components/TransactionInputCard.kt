@@ -137,6 +137,7 @@ fun TransactionInputCard(
                                 text = when (selectedType) {
                                     TransactionType.DAILY_EXPENSE -> "Daily Expense"
                                     TransactionType.MONTHLY_ADDITION -> "Add to Monthly"
+                                    else -> selectedType.name
                                 },
                                 style = MaterialTheme.typography.bodyMedium,
                                 fontWeight = FontWeight.Medium,

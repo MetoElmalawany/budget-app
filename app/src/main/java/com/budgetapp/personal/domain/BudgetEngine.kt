@@ -52,4 +52,12 @@ object BudgetEngine {
     fun addMonthlyIncome(monthlyRemaining: Double, additionAmount: Double): Double {
         return round(monthlyRemaining + additionAmount)
     }
+
+    fun subtractMonthlyExpense(monthlyRemaining: Double, amount: Double): Double {
+        return round(monthlyRemaining - amount)
+    }
+
+    fun adjustLuxuryBudget(currentLuxury: Double, delta: Double): Double {
+        return round(currentLuxury + delta)
+    }
 }
