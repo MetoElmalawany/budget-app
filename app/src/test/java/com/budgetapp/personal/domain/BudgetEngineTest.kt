@@ -80,6 +80,52 @@ class BudgetEngineTest {
     }
 
     @Test
+    fun testSubtractMonthlyExpense() {
+        // €2,500 - €450 direct expense -> €2,050
+        val updatedMonthly = BudgetEngine.subtractMonthlyExpense(
+            monthlyRemaining = 2500.0,
+            amount = 450.0
+        )
+        assertEquals(2050.0, updatedMonthly, 0.001)
+    }
+
+    @Test
+    fun testSubtractMonthlyExpenseWithRounding() {
+        val updatedMonthly = BudgetEngine.subtractMonthlyExpense(
+            monthlyRemaining = 1000.0,
+            amount = 33.333
+        )
+        assertEquals(966.67, updatedMonthly, 0.001)
+    }
+
+    @Test
+    fun testAdjustLuxuryBudgetPositive() {
+        val updatedLuxury = BudgetEngine.adjustLuxuryBudget(
+            currentLuxury = 100.0,
+            delta = 50.0
+        )
+        assertEquals(150.0, updatedLuxury, 0.001)
+    }
+
+    @Test
+    fun testAdjustLuxuryBudgetNegative() {
+        val updatedLuxury = BudgetEngine.adjustLuxuryBudget(
+            currentLuxury = 150.0,
+            delta = -75.50
+        )
+        assertEquals(74.50, updatedLuxury, 0.001)
+    }
+
+    @Test
+    fun testAdjustLuxuryBudgetWithRounding() {
+        val updatedLuxury = BudgetEngine.adjustLuxuryBudget(
+            currentLuxury = 100.0,
+            delta = 12.345
+        )
+        assertEquals(112.35, updatedLuxury, 0.001)
+    }
+
+    @Test
     fun testLastDayOfMonthSettlement() {
         // daysRemaining = 1, spent matches budget -> newDays = 0, newDaily = 0.0
         val result = BudgetEngine.endDaySettlement(
