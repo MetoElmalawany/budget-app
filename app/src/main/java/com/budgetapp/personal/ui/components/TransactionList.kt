@@ -6,7 +6,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -16,19 +15,21 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.automirrored.filled.ReceiptLong
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.budgetapp.personal.model.TransactionEntity
@@ -113,12 +114,67 @@ fun TransactionList(
 }
 
 @Composable
+fun TransactionCategoryBadge(
+    type: TransactionType,
+    modifier: Modifier = Modifier
+) {
+    val (label, containerColor, contentColor) = when (type) {
+        TransactionType.DAILY_EXPENSE -> Triple(
+            "Daily",
+            Color(0xFFE8F5E9), // Emerald/Green tint
+            Color(0xFF1B5E20)
+        )
+        TransactionType.MONTHLY_EXPENSE -> Triple(
+            "Monthly",
+            Color(0xFFE3F2FD), // Blue tint
+            Color(0xFF0D47A1)
+        )
+        TransactionType.LUXURY_EXPENSE -> Triple(
+            "Luxury",
+            Color(0xFFEDE7F6), // Purple/Indigo tint
+            Color(0xFF4A148C)
+        )
+        TransactionType.MONTHLY_ADDITION -> Triple(
+            "+ Monthly",
+            Color(0xFFE0F2F1), // Teal tint
+            Color(0xFF004D40)
+        )
+        TransactionType.LUXURY_ADDITION -> Triple(
+            "+ Luxury",
+            Color(0xFFFFF8E1), // Amber/Gold tint
+            Color(0xFFE65100)
+        )
+    }
+
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(6.dp),
+        color = containerColor
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall,
+            fontWeight = FontWeight.Bold,
+            color = contentColor,
+            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+        )
+    }
+}
+
+@Composable
 fun TransactionItem(
     transaction: TransactionEntity,
     onDelete: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val isExpense = transaction.type == TransactionType.DAILY_EXPENSE
+    val isExpense = when (transaction.type) {
+        TransactionType.DAILY_EXPENSE,
+        TransactionType.MONTHLY_EXPENSE,
+        TransactionType.LUXURY_EXPENSE -> true
+        TransactionType.MONTHLY_ADDITION,
+        TransactionType.LUXURY_ADDITION -> false
+    }
+
     val amountColor = if (isExpense) {
         MaterialTheme.colorScheme.onSurface
     } else {
@@ -138,31 +194,25 @@ fun TransactionItem(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Left: Description & Timestamp
+            // Left: Description, Category Badge & Timestamp
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = transaction.description,
                     style = MaterialTheme.typography.bodyLarge,
                     fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.onSurface,
-                    maxLines = 1
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
-                Spacer(modifier = Modifier.height(2.dp))
+                Spacer(modifier = Modifier.height(4.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
+                    TransactionCategoryBadge(type = transaction.type)
+                    Spacer(modifier = Modifier.width(6.dp))
                     Text(
                         text = FormatUtils.formatTime(transaction.timestamp),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
-                    if (!isExpense) {
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(
-                            text = "• Added to Monthly",
-                            style = MaterialTheme.typography.bodySmall,
-                            fontWeight = FontWeight.Medium,
-                            color = Color(0xFF2E7D32)
-                        )
-                    }
                 }
             }
 
@@ -211,6 +261,14 @@ fun TransactionListPreview() {
                 ),
                 TransactionEntity(
                     id = 2,
+                    amount = 120.0,
+                    description = "New Coat",
+                    timestamp = System.currentTimeMillis(),
+                    type = TransactionType.LUXURY_EXPENSE,
+                    date = "2026-11-02"
+                ),
+                TransactionEntity(
+                    id = 3,
                     amount = 50.0,
                     description = "Bonus",
                     timestamp = System.currentTimeMillis(),
