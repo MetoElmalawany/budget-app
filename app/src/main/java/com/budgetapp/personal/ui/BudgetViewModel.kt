@@ -62,7 +62,8 @@ class BudgetViewModel(
                         isDeficit = isDeficit,
                         todayTransactions = transactions,
                         currentDateFormatted = formattedDate,
-                        activeDateIso = activeDateIso
+                        activeDateIso = activeDateIso,
+                        luxuryBudget = stateEntity.luxuryBudget
                     )
                 }
             }
@@ -92,9 +93,24 @@ class BudgetViewModel(
                 monthlyBudgetRemaining = BudgetEngine.round(startingMonthlyBudget),
                 daysRemainingInMonth = daysRemaining,
                 activeMonthYear = monthYear,
-                lastClosedDate = ""
+                lastClosedDate = "",
+                luxuryBudget = 0.0
             )
             repository.saveBudgetState(state)
+        }
+    }
+
+    fun updateMonthlyBudget(newMonthlyBudget: Double) {
+        if (newMonthlyBudget < 0.0) return
+        viewModelScope.launch {
+            repository.updateMonthlyBudget(BudgetEngine.round(newMonthlyBudget))
+        }
+    }
+
+    fun updateLuxuryBudget(newLuxuryBudget: Double) {
+        if (newLuxuryBudget < 0.0) return
+        viewModelScope.launch {
+            repository.updateLuxuryBudget(BudgetEngine.round(newLuxuryBudget))
         }
     }
 
@@ -104,14 +120,40 @@ class BudgetViewModel(
             val roundedAmount = BudgetEngine.round(amount)
             val activeDateIso = _currentDate.value.toString()
 
-            if (type == TransactionType.MONTHLY_ADDITION) {
-                val currentState = repository.getBudgetStateSync()
-                if (currentState != null) {
-                    val newMonthly = BudgetEngine.addMonthlyIncome(
-                        currentState.monthlyBudgetRemaining,
-                        roundedAmount
-                    )
-                    repository.saveBudgetState(currentState.copy(monthlyBudgetRemaining = newMonthly))
+            val currentState = repository.getBudgetStateSync()
+            if (currentState != null) {
+                when (type) {
+                    TransactionType.DAILY_EXPENSE -> {
+                        // Daily expenses are tracked through the active transactions flow
+                    }
+                    TransactionType.MONTHLY_EXPENSE -> {
+                        val newMonthly = BudgetEngine.subtractMonthlyExpense(
+                            currentState.monthlyBudgetRemaining,
+                            roundedAmount
+                        )
+                        repository.saveBudgetState(currentState.copy(monthlyBudgetRemaining = newMonthly))
+                    }
+                    TransactionType.LUXURY_EXPENSE -> {
+                        val newLuxury = BudgetEngine.adjustLuxuryBudget(
+                            currentState.luxuryBudget,
+                            -roundedAmount
+                        )
+                        repository.saveBudgetState(currentState.copy(luxuryBudget = newLuxury))
+                    }
+                    TransactionType.MONTHLY_ADDITION -> {
+                        val newMonthly = BudgetEngine.addMonthlyIncome(
+                            currentState.monthlyBudgetRemaining,
+                            roundedAmount
+                        )
+                        repository.saveBudgetState(currentState.copy(monthlyBudgetRemaining = newMonthly))
+                    }
+                    TransactionType.LUXURY_ADDITION -> {
+                        val newLuxury = BudgetEngine.adjustLuxuryBudget(
+                            currentState.luxuryBudget,
+                            roundedAmount
+                        )
+                        repository.saveBudgetState(currentState.copy(luxuryBudget = newLuxury))
+                    }
                 }
             }
 
@@ -129,13 +171,7 @@ class BudgetViewModel(
 
     fun deleteTransaction(transaction: TransactionEntity) {
         viewModelScope.launch {
-            if (transaction.type == TransactionType.MONTHLY_ADDITION) {
-                val currentState = repository.getBudgetStateSync()
-                if (currentState != null) {
-                    val newMonthly = BudgetEngine.round(currentState.monthlyBudgetRemaining - transaction.amount)
-                    repository.saveBudgetState(currentState.copy(monthlyBudgetRemaining = newMonthly))
-                }
-            }
+            rollbackTransaction(transaction)
             repository.deleteTransaction(transaction.id)
         }
     }
@@ -144,15 +180,46 @@ class BudgetViewModel(
         viewModelScope.launch {
             val tx = uiState.value.todayTransactions.find { it.id == transactionId }
             if (tx != null) {
-                if (tx.type == TransactionType.MONTHLY_ADDITION) {
-                    val currentState = repository.getBudgetStateSync()
-                    if (currentState != null) {
-                        val newMonthly = BudgetEngine.round(currentState.monthlyBudgetRemaining - tx.amount)
-                        repository.saveBudgetState(currentState.copy(monthlyBudgetRemaining = newMonthly))
-                    }
-                }
+                rollbackTransaction(tx)
             }
             repository.deleteTransaction(transactionId)
+        }
+    }
+
+    private suspend fun rollbackTransaction(transaction: TransactionEntity) {
+        val currentState = repository.getBudgetStateSync() ?: return
+        when (transaction.type) {
+            TransactionType.MONTHLY_EXPENSE -> {
+                val newMonthly = BudgetEngine.addMonthlyIncome(
+                    currentState.monthlyBudgetRemaining,
+                    transaction.amount
+                )
+                repository.saveBudgetState(currentState.copy(monthlyBudgetRemaining = newMonthly))
+            }
+            TransactionType.LUXURY_EXPENSE -> {
+                val newLuxury = BudgetEngine.adjustLuxuryBudget(
+                    currentState.luxuryBudget,
+                    transaction.amount
+                )
+                repository.saveBudgetState(currentState.copy(luxuryBudget = newLuxury))
+            }
+            TransactionType.MONTHLY_ADDITION -> {
+                val newMonthly = BudgetEngine.subtractMonthlyExpense(
+                    currentState.monthlyBudgetRemaining,
+                    transaction.amount
+                )
+                repository.saveBudgetState(currentState.copy(monthlyBudgetRemaining = newMonthly))
+            }
+            TransactionType.LUXURY_ADDITION -> {
+                val newLuxury = BudgetEngine.adjustLuxuryBudget(
+                    currentState.luxuryBudget,
+                    -transaction.amount
+                )
+                repository.saveBudgetState(currentState.copy(luxuryBudget = newLuxury))
+            }
+            TransactionType.DAILY_EXPENSE -> {
+                // Deleting active row automatically updates todaySpent and todayRemaining reactively
+            }
         }
     }
 
@@ -194,6 +261,8 @@ class BudgetViewModel(
     fun onDeleteTransaction(transaction: TransactionEntity) = deleteTransaction(transaction)
     fun onDeleteTransaction(transactionId: Long) = deleteTransaction(transactionId)
     fun onEndDay() = endDay()
+    fun onUpdateMonthlyBudget(newMonthlyBudget: Double) = updateMonthlyBudget(newMonthlyBudget)
+    fun onUpdateLuxuryBudget(newLuxuryBudget: Double) = updateLuxuryBudget(newLuxuryBudget)
 
     private fun formatDate(date: LocalDate): String {
         return date.format(DateTimeFormatter.ofPattern("EEEE, MMM d", Locale.getDefault()))
