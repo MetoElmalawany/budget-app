@@ -12,5 +12,6 @@ data class BudgetUiState(
     val isDeficit: Boolean = false,
     val todayTransactions: List<TransactionEntity> = emptyList(),
     val currentDateFormatted: String = "",
-    val activeDateIso: String = ""
+    val activeDateIso: String = "",
+    val luxuryBudget: Double = 0.0
 )

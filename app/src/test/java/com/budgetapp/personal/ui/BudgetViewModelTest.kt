@@ -60,6 +60,7 @@ class BudgetViewModelTest {
         assertEquals(0.0, state.dailyBudget, 0.001)
         assertEquals(0.0, state.todaySpent, 0.001)
         assertEquals(0.0, state.todayRemaining, 0.001)
+        assertEquals(0.0, state.luxuryBudget, 0.001)
         assertFalse(state.isDeficit)
         assertTrue(state.todayTransactions.isEmpty())
         assertEquals("2026-11-02", state.activeDateIso)
@@ -80,6 +81,7 @@ class BudgetViewModelTest {
         assertEquals(100.0, state.dailyBudget, 0.001)
         assertEquals(0.0, state.todaySpent, 0.001)
         assertEquals(100.0, state.todayRemaining, 0.001)
+        assertEquals(0.0, state.luxuryBudget, 0.001)
         assertFalse(state.isDeficit)
         assertTrue(state.todayTransactions.isEmpty())
     }
@@ -93,6 +95,62 @@ class BudgetViewModelTest {
         viewModel.initializeBudget(-500.0)
         advanceUntilIdle()
         assertFalse(viewModel.uiState.value.isInitialized)
+    }
+
+    @Test
+    fun testUpdateMonthlyBudget() = runTest {
+        viewModel.initializeBudget(2900.0) // 29 days remaining -> daily €100.0
+        advanceUntilIdle()
+
+        viewModel.updateMonthlyBudget(3480.0) // 3480 / 29 = 120.0
+        advanceUntilIdle()
+
+        val state = viewModel.uiState.value
+        assertEquals(3480.0, state.monthlyBudgetRemaining, 0.001)
+        assertEquals(120.0, state.dailyBudget, 0.001)
+        assertEquals(120.0, state.todayRemaining, 0.001)
+    }
+
+    @Test
+    fun testUpdateMonthlyBudget_negativeIgnored() = runTest {
+        viewModel.initializeBudget(2900.0)
+        advanceUntilIdle()
+
+        viewModel.updateMonthlyBudget(-100.0)
+        advanceUntilIdle()
+
+        val state = viewModel.uiState.value
+        assertEquals(2900.0, state.monthlyBudgetRemaining, 0.001)
+    }
+
+    @Test
+    fun testUpdateLuxuryBudget() = runTest {
+        viewModel.initializeBudget(2900.0)
+        advanceUntilIdle()
+        assertEquals(0.0, viewModel.uiState.value.luxuryBudget, 0.001)
+
+        viewModel.updateLuxuryBudget(500.0)
+        advanceUntilIdle()
+
+        val state = viewModel.uiState.value
+        assertEquals(500.0, state.luxuryBudget, 0.001)
+        // Monthly and daily budget unaffected
+        assertEquals(2900.0, state.monthlyBudgetRemaining, 0.001)
+        assertEquals(100.0, state.dailyBudget, 0.001)
+    }
+
+    @Test
+    fun testUpdateLuxuryBudget_negativeIgnored() = runTest {
+        viewModel.initializeBudget(2900.0)
+        advanceUntilIdle()
+
+        viewModel.updateLuxuryBudget(200.0)
+        advanceUntilIdle()
+        assertEquals(200.0, viewModel.uiState.value.luxuryBudget, 0.001)
+
+        viewModel.updateLuxuryBudget(-50.0)
+        advanceUntilIdle()
+        assertEquals(200.0, viewModel.uiState.value.luxuryBudget, 0.001)
     }
 
     @Test
@@ -168,6 +226,83 @@ class BudgetViewModelTest {
     }
 
     @Test
+    fun testAddMonthlyExpense() = runTest {
+        viewModel.initializeBudget(2900.0) // 29 days left -> daily €100.0
+        advanceUntilIdle()
+
+        // Monthly bill: €290.0 deducted from monthly budget pool
+        viewModel.addTransaction(
+            amount = 290.0,
+            description = "Internet & Electricity",
+            type = TransactionType.MONTHLY_EXPENSE
+        )
+        advanceUntilIdle()
+
+        val state = viewModel.uiState.value
+        // Monthly budget decreased from 2900 to 2610
+        assertEquals(2610.0, state.monthlyBudgetRemaining, 0.001)
+        // Daily budget recalculated: 2610 / 29 = 90.0
+        assertEquals(90.0, state.dailyBudget, 0.001)
+        // todaySpent remains 0.0 because it's a monthly expense, not a daily expense
+        assertEquals(0.0, state.todaySpent, 0.001)
+        assertEquals(90.0, state.todayRemaining, 0.001)
+        assertEquals(1, state.todayTransactions.size)
+        assertEquals(TransactionType.MONTHLY_EXPENSE, state.todayTransactions[0].type)
+    }
+
+    @Test
+    fun testAddLuxuryExpense() = runTest {
+        viewModel.initializeBudget(2900.0)
+        advanceUntilIdle()
+        viewModel.updateLuxuryBudget(300.0)
+        advanceUntilIdle()
+
+        // Luxury purchase: €120.0
+        viewModel.addTransaction(
+            amount = 120.0,
+            description = "Designer Shoes",
+            type = TransactionType.LUXURY_EXPENSE
+        )
+        advanceUntilIdle()
+
+        val state = viewModel.uiState.value
+        // Luxury pool decreased: 300 - 120 = 180.0
+        assertEquals(180.0, state.luxuryBudget, 0.001)
+        // Daily and monthly budgets unaffected
+        assertEquals(2900.0, state.monthlyBudgetRemaining, 0.001)
+        assertEquals(100.0, state.dailyBudget, 0.001)
+        assertEquals(0.0, state.todaySpent, 0.001)
+        assertEquals(100.0, state.todayRemaining, 0.001)
+        assertEquals(1, state.todayTransactions.size)
+        assertEquals(TransactionType.LUXURY_EXPENSE, state.todayTransactions[0].type)
+    }
+
+    @Test
+    fun testAddLuxuryAddition() = runTest {
+        viewModel.initializeBudget(2900.0)
+        advanceUntilIdle()
+        viewModel.updateLuxuryBudget(150.0)
+        advanceUntilIdle()
+
+        viewModel.addTransaction(
+            amount = 100.0,
+            description = "Gift money",
+            type = TransactionType.LUXURY_ADDITION
+        )
+        advanceUntilIdle()
+
+        val state = viewModel.uiState.value
+        // Luxury pool increased: 150 + 100 = 250.0
+        assertEquals(250.0, state.luxuryBudget, 0.001)
+        // Monthly pool unchanged
+        assertEquals(2900.0, state.monthlyBudgetRemaining, 0.001)
+        assertEquals(100.0, state.dailyBudget, 0.001)
+        assertEquals(0.0, state.todaySpent, 0.001)
+        assertEquals(1, state.todayTransactions.size)
+        assertEquals(TransactionType.LUXURY_ADDITION, state.todayTransactions[0].type)
+    }
+
+    @Test
     fun testDeleteExpense() = runTest {
         viewModel.initializeBudget(2900.0)
         advanceUntilIdle()
@@ -226,6 +361,95 @@ class BudgetViewModelTest {
         assertEquals(2900.0, state.monthlyBudgetRemaining, 0.001)
         assertEquals(100.0, state.dailyBudget, 0.001)
         assertTrue(state.todayTransactions.isEmpty())
+    }
+
+    @Test
+    fun testDeleteMonthlyExpense_restoresMonthlyBudget() = runTest {
+        viewModel.initializeBudget(2900.0) // daily 100.0
+        advanceUntilIdle()
+
+        viewModel.addTransaction(290.0, "Gym subscription", TransactionType.MONTHLY_EXPENSE)
+        advanceUntilIdle()
+
+        assertEquals(2610.0, viewModel.uiState.value.monthlyBudgetRemaining, 0.001)
+        assertEquals(90.0, viewModel.uiState.value.dailyBudget, 0.001)
+
+        val tx = viewModel.uiState.value.todayTransactions[0]
+        viewModel.deleteTransaction(tx)
+        advanceUntilIdle()
+
+        val state = viewModel.uiState.value
+        assertEquals(2900.0, state.monthlyBudgetRemaining, 0.001)
+        assertEquals(100.0, state.dailyBudget, 0.001)
+        assertTrue(state.todayTransactions.isEmpty())
+    }
+
+    @Test
+    fun testDeleteLuxuryExpense_restoresLuxuryBudget() = runTest {
+        viewModel.initializeBudget(2900.0)
+        advanceUntilIdle()
+        viewModel.updateLuxuryBudget(200.0)
+        advanceUntilIdle()
+
+        viewModel.addTransaction(80.0, "Smart Watch", TransactionType.LUXURY_EXPENSE)
+        advanceUntilIdle()
+
+        assertEquals(120.0, viewModel.uiState.value.luxuryBudget, 0.001)
+
+        val tx = viewModel.uiState.value.todayTransactions[0]
+        viewModel.deleteTransaction(tx)
+        advanceUntilIdle()
+
+        val state = viewModel.uiState.value
+        assertEquals(200.0, state.luxuryBudget, 0.001)
+        assertTrue(state.todayTransactions.isEmpty())
+    }
+
+    @Test
+    fun testDeleteLuxuryAddition_decreasesLuxuryBudget() = runTest {
+        viewModel.initializeBudget(2900.0)
+        advanceUntilIdle()
+        viewModel.updateLuxuryBudget(100.0)
+        advanceUntilIdle()
+
+        viewModel.addTransaction(50.0, "Sold old phone", TransactionType.LUXURY_ADDITION)
+        advanceUntilIdle()
+
+        assertEquals(150.0, viewModel.uiState.value.luxuryBudget, 0.001)
+
+        val tx = viewModel.uiState.value.todayTransactions[0]
+        viewModel.deleteTransaction(tx)
+        advanceUntilIdle()
+
+        val state = viewModel.uiState.value
+        assertEquals(100.0, state.luxuryBudget, 0.001)
+        assertTrue(state.todayTransactions.isEmpty())
+    }
+
+    @Test
+    fun testDeleteTransactionsById_forMonthlyAndLuxuryTypes() = runTest {
+        viewModel.initializeBudget(2900.0)
+        advanceUntilIdle()
+        viewModel.updateLuxuryBudget(100.0)
+        advanceUntilIdle()
+
+        viewModel.addTransaction(290.0, "Car Insurance", TransactionType.MONTHLY_EXPENSE)
+        advanceUntilIdle()
+        assertEquals(2610.0, viewModel.uiState.value.monthlyBudgetRemaining, 0.001)
+
+        val monthlyTxId = viewModel.uiState.value.todayTransactions[0].id
+        viewModel.deleteTransaction(monthlyTxId)
+        advanceUntilIdle()
+        assertEquals(2900.0, viewModel.uiState.value.monthlyBudgetRemaining, 0.001)
+
+        viewModel.addTransaction(50.0, "Gadget", TransactionType.LUXURY_EXPENSE)
+        advanceUntilIdle()
+        assertEquals(50.0, viewModel.uiState.value.luxuryBudget, 0.001)
+
+        val luxuryTxId = viewModel.uiState.value.todayTransactions[0].id
+        viewModel.deleteTransaction(luxuryTxId)
+        advanceUntilIdle()
+        assertEquals(100.0, viewModel.uiState.value.luxuryBudget, 0.001)
     }
 
     @Test
@@ -327,6 +551,14 @@ class BudgetViewModelTest {
         advanceUntilIdle()
         assertEquals(2870.0, viewModel.uiState.value.monthlyBudgetRemaining, 0.001)
         assertEquals(28, viewModel.uiState.value.daysRemainingInMonth)
+
+        viewModel.onUpdateMonthlyBudget(3000.0)
+        advanceUntilIdle()
+        assertEquals(3000.0, viewModel.uiState.value.monthlyBudgetRemaining, 0.001)
+
+        viewModel.onUpdateLuxuryBudget(450.0)
+        advanceUntilIdle()
+        assertEquals(450.0, viewModel.uiState.value.luxuryBudget, 0.001)
     }
 
     private class FakeBudgetDao : BudgetDao {
