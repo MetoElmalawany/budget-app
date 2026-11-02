@@ -50,6 +50,77 @@ class BudgetRepositoryTest {
         assertEquals(25, retrieved?.daysRemainingInMonth)
         assertEquals("2026-11", retrieved?.activeMonthYear)
         assertEquals("2026-11-01", retrieved?.lastClosedDate)
+        assertEquals(0.0, retrieved?.luxuryBudget ?: 0.0, 0.001)
+    }
+
+    @Test
+    fun saveBudgetState_withLuxuryBudget_persistsLuxuryBudget() = runTest {
+        val state = BudgetStateEntity(
+            id = 1,
+            monthlyBudgetRemaining = 2000.0,
+            daysRemainingInMonth = 30,
+            activeMonthYear = "2026-11",
+            luxuryBudget = 150.0
+        )
+        repository.saveBudgetState(state)
+
+        val retrieved = repository.getBudgetStateSync()
+        assertNotNull(retrieved)
+        assertEquals(150.0, retrieved?.luxuryBudget ?: 0.0, 0.001)
+    }
+
+    @Test
+    fun updateMonthlyBudget_updatesMonthlyBudgetRemaining() = runTest {
+        val state = BudgetStateEntity(
+            id = 1,
+            monthlyBudgetRemaining = 1000.0,
+            daysRemainingInMonth = 20,
+            activeMonthYear = "2026-11",
+            luxuryBudget = 50.0
+        )
+        repository.saveBudgetState(state)
+
+        repository.updateMonthlyBudget(1200.0)
+
+        val updated = repository.getBudgetStateSync()
+        assertNotNull(updated)
+        assertEquals(1200.0, updated?.monthlyBudgetRemaining ?: 0.0, 0.001)
+        assertEquals(20, updated?.daysRemainingInMonth)
+        assertEquals("2026-11", updated?.activeMonthYear)
+        assertEquals(50.0, updated?.luxuryBudget ?: 0.0, 0.001)
+    }
+
+    @Test
+    fun updateMonthlyBudget_whenNoBudgetState_doesNothing() = runTest {
+        repository.updateMonthlyBudget(1200.0)
+        assertNull(repository.getBudgetStateSync())
+    }
+
+    @Test
+    fun updateLuxuryBudget_updatesLuxuryBudget() = runTest {
+        val state = BudgetStateEntity(
+            id = 1,
+            monthlyBudgetRemaining = 1000.0,
+            daysRemainingInMonth = 20,
+            activeMonthYear = "2026-11",
+            luxuryBudget = 50.0
+        )
+        repository.saveBudgetState(state)
+
+        repository.updateLuxuryBudget(85.5)
+
+        val updated = repository.getBudgetStateSync()
+        assertNotNull(updated)
+        assertEquals(85.5, updated?.luxuryBudget ?: 0.0, 0.001)
+        assertEquals(1000.0, updated?.monthlyBudgetRemaining ?: 0.0, 0.001)
+        assertEquals(20, updated?.daysRemainingInMonth)
+        assertEquals("2026-11", updated?.activeMonthYear)
+    }
+
+    @Test
+    fun updateLuxuryBudget_whenNoBudgetState_doesNothing() = runTest {
+        repository.updateLuxuryBudget(85.5)
+        assertNull(repository.getBudgetStateSync())
     }
 
     @Test

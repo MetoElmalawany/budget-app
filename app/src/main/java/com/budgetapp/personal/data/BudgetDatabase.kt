@@ -8,7 +8,7 @@ import androidx.room.TypeConverters
 import com.budgetapp.personal.model.BudgetStateEntity
 import com.budgetapp.personal.model.TransactionEntity
 
-@Database(entities = [BudgetStateEntity::class, TransactionEntity::class], version = 1, exportSchema = false)
+@Database(entities = [BudgetStateEntity::class, TransactionEntity::class], version = 2, exportSchema = false)
 @TypeConverters(Converters::class)
 abstract class BudgetDatabase : RoomDatabase() {
     abstract fun budgetDao(): BudgetDao

@@ -16,6 +16,16 @@ class BudgetRepository(private val dao: BudgetDao) {
         dao.saveBudgetState(state)
     }
 
+    suspend fun updateMonthlyBudget(newMonthlyBudget: Double) {
+        val current = getBudgetStateSync() ?: return
+        saveBudgetState(current.copy(monthlyBudgetRemaining = newMonthlyBudget))
+    }
+
+    suspend fun updateLuxuryBudget(newLuxuryBudget: Double) {
+        val current = getBudgetStateSync() ?: return
+        saveBudgetState(current.copy(luxuryBudget = newLuxuryBudget))
+    }
+
     fun getActiveTodayTransactions(date: String): Flow<List<TransactionEntity>> {
         return dao.getActiveTodayTransactions(date)
     }

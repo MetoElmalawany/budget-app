@@ -9,5 +9,6 @@ data class BudgetStateEntity(
     val monthlyBudgetRemaining: Double,
     val daysRemainingInMonth: Int,
     val activeMonthYear: String,
-    val lastClosedDate: String = ""
+    val lastClosedDate: String = "",
+    val luxuryBudget: Double = 0.0
 )
